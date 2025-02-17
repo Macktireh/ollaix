@@ -1,0 +1,64 @@
+[project]
+name = "aix"
+version = "0.1.0"
+description = "AI project "
+authors = [
+    {name = "Macktireh", email = "abdimack97@gmail.com"},
+]
+readme = "README.md"
+license = {text = "MIT"}
+dependencies = []
+requires-python = ">=3.12"
+
+[tool.pdm]
+distribution = false
+[tool.pdm.scripts]
+dev = "python main.py"
+
+
+[tool.ruff]
+line-length = 110
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".git-rewrite",
+    ".hg",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "venv",
+]
+[tool.ruff.lint]
+select = [
+    # pycodestyle
+    "E",
+    # Pyflakes
+    "F",
+    # pyupgrade
+    "UP",
+    # flake8-bugbear
+    "B",
+    # flake8-simplify
+    "SIM",
+    # isort
+    "I",
+]
+
+[dependency-groups]
+lint = [
+    "ruff>=0.9.6",
+]
+
