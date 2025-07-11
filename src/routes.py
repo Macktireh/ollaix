@@ -1,3 +1,11 @@
-from controllers import health_check
+from litestar import Router
 
-routes = [health_check]
+from controllers import health_check
+from controllers.chat_controller import ChatController
+
+chat_router = Router(
+    path="/v1",
+    route_handlers=[ChatController],
+)
+
+routes = [health_check, chat_router]
