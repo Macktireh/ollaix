@@ -32,9 +32,10 @@ testcov = { cmd = "pytest --cov-report term-missing --cov=src -v", env = { PYTHO
 testcovhtml = { cmd = "pytest --cov-report html --cov=src", env = { PYTHONPATH = "src", GEMINI_API_KEY = "test" } }
 test = { composite = ["testcov", "testcovhtml"] }
 ruffformat = "ruff format"
-ruffcheck = "ruff check --fix"
+ruffcheck = "ruff check"
+ruffcheckfix = "ruff check --fix"
 ruffcheckdiff = "ruff check --diff"
-ruff = { composite = ["ruffformat", "ruffcheck"] }
+ruff = { composite = ["ruffformat", "ruffcheckfix"] }
 
 
 [tool.pytest.ini_options]
