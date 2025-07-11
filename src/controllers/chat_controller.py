@@ -43,6 +43,7 @@ class ChatController(Controller):
         ],
         ollama_service: AIServiceInterface,
         gemini_service: AIServiceInterface,
+        dummy_service: AIServiceInterface,
     ) -> Stream | ChatCompletionResponse:
         """
         Generates a response for a chat completion request.
@@ -63,7 +64,7 @@ class ChatController(Controller):
             raise ValidationException("Stream parameter must be a boolean.")
 
         service = self._get_service_for_model(
-            data.model, ollama_service, gemini_service
+            data.model, ollama_service, gemini_service, dummy_service
         )
 
         if data.stream:
@@ -75,6 +76,7 @@ class ChatController(Controller):
         model: str,
         ollama_service: AIServiceInterface,
         gemini_service: AIServiceInterface,
+        dummy_service: AIServiceInterface,
     ) -> AIServiceInterface:
         """
         Determines the appropriate AI service to handle the request based on the selected model.
@@ -86,5 +88,7 @@ class ChatController(Controller):
             return ollama_service
         if model in gemini_service.available_models:
             return gemini_service
+        if model in dummy_service.available_models:
+            return dummy_service
 
         raise ValidationException(f"Model '{model}' is not available.")
