@@ -1,3 +1,3 @@
+from controllers import health_check
 
-
-routes = []
+routes = [health_check]
