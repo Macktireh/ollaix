@@ -1,0 +1,90 @@
+[project]
+name = "ollaix"
+version = "0.1.0"
+description = ""
+authors = [
+    { name = "Macktireh", email = "abdimack97@gmail.com" }
+]
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.13"
+# pdm add google-genai litestar[standard] ollama python-dotenv
+dependencies = [
+    "google-genai>=1.24.0",
+    "litestar[standard]>=2.16.0",
+    "ollama>=0.5.1",
+    "python-dotenv>=1.1.1"
+]
+
+[dependency-groups]
+lint = [
+    "ruff>=0.12.2",
+]
+test = [
+    "pytest>=8.4.1",
+    "pytest-asyncio>=1.0.0",
+    "pytest-cov>=6.2.1",
+]
+
+[tool.pdm.scripts]
+dev = { cmd = "litestar --app=src.main:app run --reload --host localhost", env = { PYTHONPATH = "src" } }
+testcov = { cmd = "pytest --cov-report term-missing --cov=src -v", env = { PYTHONPATH = "src", GEMINI_API_KEY = "test" } }
+testcovhtml = { cmd = "pytest --cov-report html --cov=src", env = { PYTHONPATH = "src", GEMINI_API_KEY = "test" } }
+test = { composite = ["testcov", "testcovhtml"] }
+ruffformat = "ruff format"
+ruffcheck = "ruff check --fix"
+ruffcheckdiff = "ruff check --diff"
+ruff = { composite = ["ruffformat", "ruffcheck"] }
+
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+
+[tool.ruff]
+line-length = 99
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".git-rewrite",
+    ".hg",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "venv",
+]
+[tool.ruff.lint]
+select = [
+    # pycodestyle
+    "E",
+    # Pyflakes
+    "F",
+    # pyupgrade
+    "UP",
+    # flake8-bugbear
+    "B",
+    # flake8-simplify
+    "SIM",
+    # isort
+    "I",
+]
+
+
+[tool.pdm]
+distribution = false
