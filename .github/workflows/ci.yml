@@ -22,7 +22,7 @@ jobs:
       - name: Install dependencies
         run: pdm install -dG lint
       - name: Run tests
-        run: pdm run ruffcheckdiff
+        run: pdm run ruffcheck
 
   testing:
     name: Testing
@@ -39,4 +39,4 @@ jobs:
       - name: Install dependencies
         run: pdm install -dG test
       - name: Run tests
-        run: pdm run ptest
+        run: pdm run testcov
