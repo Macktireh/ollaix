@@ -37,8 +37,7 @@ class ChatController(Controller):
         data: Annotated[
             ChatCompletionRequest,
             Body(
-                title="Chat completion request",
-                description="Payload containing the chat messages and model configuration.",
+                title="Chat completion request",description="Payload containing the chat messages and model configuration.",
             ),
         ],
         ollama_service: AIServiceInterface,
