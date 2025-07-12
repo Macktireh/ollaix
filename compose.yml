@@ -1,0 +1,81 @@
+services:
+  ollaix_api:
+    build:
+      context: .
+      dockerfile: /docker/api/Dockerfile
+    image: ollaix_api
+    container_name: ollaix_api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./src:/project
+    env_file:
+      - .env
+    depends_on:
+      ollaix_ollama_gemma3_1b:
+        condition: service_healthy
+      ollaix_ollama_qwen3_1_7b:
+        condition: service_healthy
+      ollaix_ollama_deepseek_r1_1_5b:
+        condition: service_healthy
+    networks:
+      - ollaix_network
+    restart: unless-stopped
+
+  ollaix_ollama_gemma3_1b: &ollaix_ollama_gemma3_1b
+    build:
+      context: .
+      dockerfile: /docker/ollama/Dockerfile
+      args:
+        - MODEL_NAME=gemma3:1b
+    image: ollaix_ollama_gemma3_1b
+    container_name: ollaix_ollama_gemma3_1b
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollaix_ollama_gemma3_1b_volume:/root/.ollama
+    networks:
+      - ollaix_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  ollaix_ollama_qwen3_1_7b:
+    <<: *ollaix_ollama_gemma3_1b
+    build:
+      context: .
+      dockerfile: /docker/ollama/Dockerfile
+      args:
+        - MODEL_NAME=qwen3:1.7b
+    image: ollaix_ollama_qwen3_1_7b
+    container_name: ollaix_ollama_qwen3_1_7b
+    ports:
+      - "11435:11434"
+    volumes:
+      - ollaix_ollama_qwen3_1_7b_volume:/root/.ollama
+
+  ollaix_ollama_deepseek_r1_1_5b:
+    <<: *ollaix_ollama_gemma3_1b
+    build:
+      context: .
+      dockerfile: /docker/ollama/Dockerfile
+      args:
+        - MODEL_NAME=deepseek-r1:1.5b
+    image: ollaix_ollama_deepseek_r1_1_5b
+    container_name: ollaix_ollama_deepseek_r1_1_5b
+    ports:
+      - "11436:11434"
+    volumes:
+      - ollaix_ollama_deepseek_r1_1_5b_volume:/root/.ollama
+
+volumes:
+  ollaix_ollama_gemma3_1b_volume:
+  ollaix_ollama_qwen3_1_7b_volume:
+  ollaix_ollama_deepseek_r1_1_5b_volume:
+  
+networks:
+  ollaix_network:
+    name: ollaix_network
