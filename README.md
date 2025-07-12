@@ -1,6 +1,9 @@
-# Ollaix 🤖
+<h1 align="center">Ollaix 🤖</h1>
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+<p align="center">
+    <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT" />
+    <img src="https://codecov.io/github/macktireh/ollaix/branch/main/graph/badge.svg?token=Z2FJ0LDRLV" alt="codecov" />
+</p>
 
 Welcome to the Ollaix API! This is the backend component of the Ollaix project, designed to serve as a versatile bridge between your applications and various Large Language Models (LLMs). 🤖
 
