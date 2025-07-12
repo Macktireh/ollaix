@@ -1,3 +1,5 @@
+name: "ollaix_development"
+
 services:
   ollaix_api:
     build:
@@ -10,7 +12,7 @@ services:
     volumes:
       - ./src:/project
     env_file:
-      - .env
+      - .env.local
     depends_on:
       ollaix_ollama_gemma3_1b:
         condition: service_healthy
