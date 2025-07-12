@@ -29,7 +29,7 @@ test = [
 [tool.pdm.scripts]
 dev = { cmd = "litestar --app=src.main:app run --reload --host localhost", env = { PYTHONPATH = "src" } }
 testcov = { cmd = "pytest --cov-report term-missing --cov=src -v", env = { PYTHONPATH = "src", GEMINI_API_KEY = "test" } }
-testcovhtml = { cmd = "pytest --cov-report html --cov=src", env = { PYTHONPATH = "src", GEMINI_API_KEY = "test" } }
+testcovreport = { cmd = "pytest --junitxml=pytest.xml --cov-report=term-missing --cov=src tests/ | tee pytest-coverage.txt", env = { PYTHONPATH = "src", GEMINI_API_KEY = "test" } }
 test = { composite = ["testcov", "testcovhtml"] }
 ruffformat = "ruff format"
 ruffcheck = "ruff check"
