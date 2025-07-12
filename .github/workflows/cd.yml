@@ -193,15 +193,15 @@ jobs:
         if: always()
         run: docker stop ${{ env.OLLAIX_OLLAMA_GEMMA3_CONTAINER_NAME_TESTING }}
 
-      # - name: Build and push Docker image
-      #   id: push
-      #   uses: docker/build-push-action@v5
-      #   with:
-      #     context: .
-      #     file: docker/ollama/Dockerfile
-      #     push: true
-      #     tags: ${{ steps.meta.outputs.tags }}
-      #     labels: ${{ steps.meta.outputs.labels }}
+      - name: Push Docker image
+        id: push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/ollama/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
 
   ollaix-ollama-qwen3-1_7b:
     needs: changes
@@ -282,15 +282,15 @@ jobs:
         if: always()
         run: docker stop ${{ env.OLLAIX_OLLAMA_QWEN3_CONTAINER_NAME_TESTING }}
 
-      # - name: Build and push Docker image
-      #   id: push
-      #   uses: docker/build-push-action@v5
-      #   with:
-      #     context: .
-      #     file: docker/ollama/Dockerfile
-      #     push: true
-      #     tags: ${{ steps.meta.outputs.tags }}
-      #     labels: ${{ steps.meta.outputs.labels }}
+      - name: Push Docker image
+        id: push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/ollama/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
 
   ollaix-ollama-deepseek-r1-1_5b:
     needs: changes
@@ -371,15 +371,15 @@ jobs:
         if: always()
         run: docker stop ${{ env.OLLAIX_OLLAMA_DEEPSEEK_R1_CONTAINER_NAME_TESTING }}
 
-      # - name: Build and push Docker image
-      #   id: push
-      #   uses: docker/build-push-action@v5
-      #   with:
-      #     context: .
-      #     file: docker/ollama/Dockerfile
-      #     push: true
-      #     tags: ${{ steps.meta.outputs.tags }}
-      #     labels: ${{ steps.meta.outputs.labels }}
+      - name: Push Docker image
+        id: push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/ollama/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
 
   ollaix-api:
     needs: changes
@@ -428,7 +428,7 @@ jobs:
           docker run -d --name ${{ env.OLLAIX_API_CONTAINER_NAME_TESTING }} -p 8000:8000 -e GEMINI_API_KEY=gemini_api_key $IMAGE_TAG
           sleep ${{ env.HEALTH_CHECK_TIMEOUT }}
 
-      - name: Health Check
+      - name: Health Check - API
         run: |
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" ${{ env.OLLAIX_API_HEALTH_CHECK_URL }})
           echo "Health Check Status: $STATUS"
@@ -443,12 +443,12 @@ jobs:
         if: always()
         run: docker stop ${{ env.OLLAIX_API_CONTAINER_NAME_TESTING }}
 
-      # - name: Build and push Docker image
-      #   id: push
-      #   uses: docker/build-push-action@v5
-      #   with:
-      #     context: .
-      #     file: docker/api/Dockerfile.prod
-      #     push: true
-      #     tags: ${{ steps.meta.outputs.tags }}
-      #     labels: ${{ steps.meta.outputs.labels }}
+      - name: Push Docker image
+        id: push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/api/Dockerfile.prod
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
