@@ -1,0 +1,454 @@
+name: "CD Workflow: Build, Test and publish Docker Image"
+
+on:
+  release:
+    types:
+      - published
+
+env:
+  REGISTRY: ghcr.io
+  # Image names
+  OLLAIX_OLLAMA_GEMMA3_IMAGE_NAME: ${{ github.repository }}-ollama-gemma3-1b
+  OLLAIX_OLLAMA_QWEN3_IMAGE_NAME: ${{ github.repository }}-ollama-qwen3-1_7b
+  OLLAIX_OLLAMA_DEEPSEEK_R1_IMAGE_NAME: ${{ github.repository }}-ollama-deepseek-r1-1_5b
+  OLLAIX_API_IMAGE_NAME: ${{ github.repository }}-api
+  # Container names for testing
+  OLLAIX_OLLAMA_GEMMA3_CONTAINER_NAME_TESTING: ollaix-ollama-gemma3-1b
+  OLLAIX_OLLAMA_QWEN3_CONTAINER_NAME_TESTING: ollaix-ollama-qwen3-1_7b
+  OLLAIX_OLLAMA_DEEPSEEK_R1_CONTAINER_NAME_TESTING: ollaix-ollama-deepseek-r1-1_5b
+  OLLAIX_API_CONTAINER_NAME_TESTING: ollaix-api
+  # Ollama model name
+  OLLAIX_OLLAMA_GEMMA3_MODEL_NAME: gemma3:1b
+  OLLAIX_OLLAMA_QWEN3_MODEL_NAME: qwen3:1.7b
+  OLLAIX_OLLAMA_DEEPSEEK_R1_MODEL_NAME: deepseek-r1:1.5b
+  # Health check configuration
+  OLLAIX_API_HEALTH_CHECK_URL: http://localhost:8000/health
+  OLLAIX_OLLAMA_HEALTH_CHECK_URL: http://localhost:11434/api/tags
+  HEALTH_CHECK_TIMEOUT: 10
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      # Combine outputs: takes the value of the forced build or, failing that, that of the filter.
+      api: ${{ steps.force_build.outputs.api || steps.filter_changes.outputs.api }}
+      ollama: ${{ steps.force_build.outputs.ollama || steps.filter_changes.outputs.ollama }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: "1. Check release type (First or Subsequent)"
+        id: check_type
+        run: |
+          IS_PRERELEASE="${{ github.event.release.prerelease }}"
+          IS_FIRST='false'
+
+          if [ "$IS_PRERELEASE" = "true" ]; then
+            # For a pre-release, we check whether it is the very first tag in the repository
+            TAG_COUNT=$(git tag | wc -l)
+            if [ "$TAG_COUNT" -le 1 ]; then
+              IS_FIRST='true'
+              echo "✅ This is the very first pre-release. The build will be forced."
+            else
+              echo "ℹ️ This is the next pre-release."
+            fi
+          else
+            # For a stable release, we check whether it is the first STABLE release.
+            # Tags containing -rc, -alpha, -beta etc. are excluded.
+            STABLE_TAG_COUNT=$(git tag | grep -v -E "(-rc|-alpha|-beta)" | wc -l)
+            if [ "$STABLE_TAG_COUNT" -le 1 ]; then
+              IS_FIRST='true'
+              echo "✅ This is the first stable release. The build will be forced."
+            else
+              echo "ℹ️ This is the next stable release."
+            fi
+          fi
+          echo "is_first_release=$IS_FIRST" >> $GITHUB_OUTPUT
+
+      - name: "2a. Set outputs for a First Release"
+        id: force_build
+        if: steps.check_type.outputs.is_first_release == 'true'
+        run: |
+          echo "api=true" >> $GITHUB_OUTPUT
+          echo "ollama=true" >> $GITHUB_OUTPUT
+
+      - name: "2b. Get previous tag for a Subsequent Release"
+        id: previous_tag
+        if: steps.check_type.outputs.is_first_release == 'false'
+        run: |
+          CURRENT_TAG="${{ github.event.release.tag_name }}"
+          IS_PRERELEASE="${{ github.event.release.prerelease }}"
+          
+          if [ "$IS_PRERELEASE" = "true" ]; then
+            # For a pre-release, we compare with any previous tag
+            PREV_TAG=$(git tag --sort=-creatordate | grep -v "^$CURRENT_TAG$" | head -n1)
+          else
+            # For a stable release, we compare it with the last stable release
+            PREV_TAG=$(git tag --sort=-creatordate | grep -v -E "(-rc|-alpha|-beta)" | grep -v "^$CURRENT_TAG$" | head -n1)
+          fi
+          echo "🔍 Comparison with the previous tag: $PREV_TAG"
+          echo "prev_tag=$PREV_TAG" >> $GITHUB_OUTPUT
+      
+      - name: "3. Filter changed paths for a Subsequent Release"
+        id: filter_changes
+        if: steps.check_type.outputs.is_first_release == 'false'
+        uses: dorny/paths-filter@v3
+        with:
+          base: ${{ steps.previous_tag.outputs.prev_tag }}
+          ref: ${{ github.event.release.tag_name }}
+          filters: |
+            api:
+              - 'src/**'
+              - 'docker/api/**'
+              - 'pyproject.toml'
+              - 'pdm.lock'
+            ollama:
+              - 'docker/ollama/**'
+      
+      - name: "Show outputs for debugging"
+        run: |
+          echo "Outputs:"
+          echo "API: ${{ steps.force_build.outputs.api || steps.filter_changes.outputs.api }}"
+          echo "Ollama: ${{ steps.force_build.outputs.ollama || steps.filter_changes.outputs.ollama }}"
+
+  ollaix-ollama-gemma3-1b:
+    needs: changes
+    if: needs.changes.outputs.ollama == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.OLLAIX_OLLAMA_GEMMA3_IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}}
+            ${{ github.event.release.prerelease == true && 'type=raw,value=pre-release' || 'type=raw,value=latest' }}
+
+      - name: Build Docker image without push
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/ollama/Dockerfile
+          push: false
+          build-args: |
+            MODEL_NAME=${{ env.OLLAIX_OLLAMA_GEMMA3_MODEL_NAME }}
+          tags: ${{ steps.meta.outputs.tags }}
+
+      - name: Run Docker container
+        run: |
+          IMAGE_TAGS=$(echo "${{ steps.meta.outputs.tags }}" | cut -d ' ' -f1 | xargs)
+          IMAGE_TAG=$(echo "$IMAGE_TAGS" | cut -d ' ' -f1 | xargs)
+          echo "Image tag to test: $IMAGE_TAG"
+          docker run -d --name ${{ env.OLLAIX_OLLAMA_GEMMA3_CONTAINER_NAME_TESTING }} -p 11434:11434 $IMAGE_TAG
+          sleep ${{ env.HEALTH_CHECK_TIMEOUT }}
+
+      - name: Health Check - Ollama Model
+        run: |
+          RESPONSE=$(curl -s -w "\n%{http_code}" ${{ env.OLLAIX_OLLAMA_HEALTH_CHECK_URL }})
+          BODY=$(echo "$RESPONSE" | head -n1)
+          STATUS=$(echo "$RESPONSE" | tail -n1)
+
+          echo "Health Check for model: ${{ env.OLLAIX_OLLAMA_GEMMA3_MODEL_NAME }}"
+          echo "Health Check Status: $STATUS"
+          echo "Response Body: $BODY"
+
+          if [ "$STATUS" -ne 200 ]; then
+            echo "❌ Ollama health check failed with status $STATUS"
+            docker logs ${{ env.OLLAIX_OLLAMA_GEMMA3_CONTAINER_NAME_TESTING }}
+            exit 1
+          fi
+
+          echo "$BODY" | grep -q "${{ env.OLLAIX_OLLAMA_GEMMA3_MODEL_NAME }}"
+          if [ $? -ne 0 ]; then
+            echo "❌ Model '${{ env.OLLAIX_OLLAMA_GEMMA3_MODEL_NAME }}' not found in health check response"
+            docker logs ${{ env.OLLAIX_OLLAMA_GEMMA3_CONTAINER_NAME_TESTING }}
+            exit 1
+          fi
+
+          echo "✅ Ollama model '${{ env.OLLAIX_OLLAMA_GEMMA3_MODEL_NAME }}' health check passed"
+
+
+      - name: Stop Docker container
+        if: always()
+        run: docker stop ${{ env.OLLAIX_OLLAMA_GEMMA3_CONTAINER_NAME_TESTING }}
+
+      # - name: Build and push Docker image
+      #   id: push
+      #   uses: docker/build-push-action@v5
+      #   with:
+      #     context: .
+      #     file: docker/ollama/Dockerfile
+      #     push: true
+      #     tags: ${{ steps.meta.outputs.tags }}
+      #     labels: ${{ steps.meta.outputs.labels }}
+
+  ollaix-ollama-qwen3-1_7b:
+    needs: changes
+    if: needs.changes.outputs.ollama == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.OLLAIX_OLLAMA_QWEN3_IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}}
+            ${{ github.event.release.prerelease == true && 'type=raw,value=pre-release' || 'type=raw,value=latest' }}
+
+      - name: Build Docker image without push
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/ollama/Dockerfile
+          push: false
+          build-args: |
+            MODEL_NAME=${{ env.OLLAIX_OLLAMA_QWEN3_MODEL_NAME }}
+          tags: ${{ steps.meta.outputs.tags }}
+
+      - name: Run Docker container
+        run: |
+          IMAGE_TAGS=$(echo "${{ steps.meta.outputs.tags }}" | cut -d ' ' -f1 | xargs)
+          IMAGE_TAG=$(echo "$IMAGE_TAGS" | cut -d ' ' -f1 | xargs)
+          echo "Image tag to test: $IMAGE_TAG"
+          docker run -d --name ${{ env.OLLAIX_OLLAMA_QWEN3_CONTAINER_NAME_TESTING }} -p 11434:11434 $IMAGE_TAG
+          sleep ${{ env.HEALTH_CHECK_TIMEOUT }}
+
+      - name: Health Check - Ollama Model
+        run: |
+          RESPONSE=$(curl -s -w "\n%{http_code}" ${{ env.OLLAIX_OLLAMA_HEALTH_CHECK_URL }})
+          BODY=$(echo "$RESPONSE" | head -n1)
+          STATUS=$(echo "$RESPONSE" | tail -n1)
+
+          echo "Health Check for model: ${{ env.OLLAIX_OLLAMA_QWEN3_MODEL_NAME }}"
+          echo "Health Check Status: $STATUS"
+          echo "Response Body: $BODY"
+
+          if [ "$STATUS" -ne 200 ]; then
+            echo "❌ Ollama health check failed with status $STATUS"
+            docker logs ${{ env.OLLAIX_OLLAMA_QWEN3_CONTAINER_NAME_TESTING }}
+            exit 1
+          fi
+
+          echo "$BODY" | grep -q "${{ env.OLLAIX_OLLAMA_QWEN3_MODEL_NAME }}"
+          if [ $? -ne 0 ]; then
+            echo "❌ Model '${{ env.OLLAIX_OLLAMA_QWEN3_MODEL_NAME }}' not found in health check response"
+            docker logs ${{ env.OLLAIX_OLLAMA_QWEN3_CONTAINER_NAME_TESTING }}
+            exit 1
+          fi
+
+          echo "✅ Ollama model '${{ env.OLLAIX_OLLAMA_QWEN3_MODEL_NAME }}' health check passed"
+
+
+      - name: Stop Docker container
+        if: always()
+        run: docker stop ${{ env.OLLAIX_OLLAMA_QWEN3_CONTAINER_NAME_TESTING }}
+
+      # - name: Build and push Docker image
+      #   id: push
+      #   uses: docker/build-push-action@v5
+      #   with:
+      #     context: .
+      #     file: docker/ollama/Dockerfile
+      #     push: true
+      #     tags: ${{ steps.meta.outputs.tags }}
+      #     labels: ${{ steps.meta.outputs.labels }}
+
+  ollaix-ollama-deepseek-r1-1_5b:
+    needs: changes
+    if: needs.changes.outputs.ollama == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.OLLAIX_OLLAMA_DEEPSEEK_R1_IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}}
+            ${{ github.event.release.prerelease == true && 'type=raw,value=pre-release' || 'type=raw,value=latest' }}
+
+      - name: Build Docker image without push
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/ollama/Dockerfile
+          push: false
+          build-args: |
+            MODEL_NAME=${{ env.OLLAIX_OLLAMA_DEEPSEEK_R1_MODEL_NAME }}
+          tags: ${{ steps.meta.outputs.tags }}
+
+      - name: Run Docker container
+        run: |
+          IMAGE_TAGS=$(echo "${{ steps.meta.outputs.tags }}" | cut -d ' ' -f1 | xargs)
+          IMAGE_TAG=$(echo "$IMAGE_TAGS" | cut -d ' ' -f1 | xargs)
+          echo "Image tag to test: $IMAGE_TAG"
+          docker run -d --name ${{ env.OLLAIX_OLLAMA_DEEPSEEK_R1_CONTAINER_NAME_TESTING }} -p 11434:11434 $IMAGE_TAG
+          sleep ${{ env.HEALTH_CHECK_TIMEOUT }}
+
+      - name: Health Check - Ollama Model
+        run: |
+          RESPONSE=$(curl -s -w "\n%{http_code}" ${{ env.OLLAIX_OLLAMA_HEALTH_CHECK_URL }})
+          BODY=$(echo "$RESPONSE" | head -n1)
+          STATUS=$(echo "$RESPONSE" | tail -n1)
+
+          echo "Health Check for model: ${{ env.OLLAIX_OLLAMA_DEEPSEEK_R1_MODEL_NAME }}"
+          echo "Health Check Status: $STATUS"
+          echo "Response Body: $BODY"
+
+          if [ "$STATUS" -ne 200 ]; then
+            echo "❌ Ollama health check failed with status $STATUS"
+            docker logs ${{ env.OLLAIX_OLLAMA_DEEPSEEK_R1_CONTAINER_NAME_TESTING }}
+            exit 1
+          fi
+
+          echo "$BODY" | grep -q "${{ env.OLLAIX_OLLAMA_DEEPSEEK_R1_MODEL_NAME }}"
+          if [ $? -ne 0 ]; then
+            echo "❌ Model '${{ env.OLLAIX_OLLAMA_DEEPSEEK_R1_MODEL_NAME }}' not found in health check response"
+            docker logs ${{ env.OLLAIX_OLLAMA_DEEPSEEK_R1_CONTAINER_NAME_TESTING }}
+            exit 1
+          fi
+
+          echo "✅ Ollama model '${{ env.OLLAIX_OLLAMA_DEEPSEEK_R1_MODEL_NAME }}' health check passed"
+
+
+      - name: Stop Docker container
+        if: always()
+        run: docker stop ${{ env.OLLAIX_OLLAMA_DEEPSEEK_R1_CONTAINER_NAME_TESTING }}
+
+      # - name: Build and push Docker image
+      #   id: push
+      #   uses: docker/build-push-action@v5
+      #   with:
+      #     context: .
+      #     file: docker/ollama/Dockerfile
+      #     push: true
+      #     tags: ${{ steps.meta.outputs.tags }}
+      #     labels: ${{ steps.meta.outputs.labels }}
+
+  ollaix-api:
+    needs: changes
+    if: needs.changes.outputs.api == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.OLLAIX_API_IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}}
+            ${{ github.event.release.prerelease == true && 'type=raw,value=pre-release' || 'type=raw,value=latest' }}
+
+      - name: Build Docker image without push
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/api/Dockerfile.prod
+          push: false
+          tags: ${{ steps.meta.outputs.tags }}
+
+      - name: Run Docker container
+        run: |
+          IMAGE_TAGS=$(echo "${{ steps.meta.outputs.tags }}" | cut -d ' ' -f1 | xargs)
+          IMAGE_TAG=$(echo "$IMAGE_TAGS" | cut -d ' ' -f1 | xargs)
+          echo "Image tag to test: $IMAGE_TAG"
+          docker run -d --name ${{ env.OLLAIX_API_CONTAINER_NAME_TESTING }} -p 8000:8000 -e GEMINI_API_KEY=gemini_api_key $IMAGE_TAG
+          sleep ${{ env.HEALTH_CHECK_TIMEOUT }}
+
+      - name: Health Check
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" ${{ env.OLLAIX_API_HEALTH_CHECK_URL }})
+          echo "Health Check Status: $STATUS"
+          if [ $STATUS -ne 200 ]; then
+            echo "❌ Health check failed"
+            docker logs ${{ env.OLLAIX_API_CONTAINER_NAME_TESTING }}
+            exit 1
+          fi
+          echo "✅ Health check passed"
+
+      - name: Stop Docker container
+        if: always()
+        run: docker stop ${{ env.OLLAIX_API_CONTAINER_NAME_TESTING }}
+
+      # - name: Build and push Docker image
+      #   id: push
+      #   uses: docker/build-push-action@v5
+      #   with:
+      #     context: .
+      #     file: docker/api/Dockerfile.prod
+      #     push: true
+      #     tags: ${{ steps.meta.outputs.tags }}
+      #     labels: ${{ steps.meta.outputs.labels }}
