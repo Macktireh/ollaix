@@ -200,6 +200,8 @@ jobs:
           context: .
           file: docker/ollama/Dockerfile
           push: true
+          build-args: |
+            MODEL_NAME=${{ env.OLLAIX_OLLAMA_GEMMA3_MODEL_NAME }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
@@ -289,6 +291,8 @@ jobs:
           context: .
           file: docker/ollama/Dockerfile
           push: true
+          build-args: |
+            MODEL_NAME=${{ env.OLLAIX_OLLAMA_QWEN3_MODEL_NAME }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
@@ -378,6 +382,8 @@ jobs:
           context: .
           file: docker/ollama/Dockerfile
           push: true
+          build-args: |
+            MODEL_NAME=${{ env.OLLAIX_OLLAMA_DEEPSEEK_R1_MODEL_NAME }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
