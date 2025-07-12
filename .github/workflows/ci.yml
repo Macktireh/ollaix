@@ -48,14 +48,18 @@ jobs:
         run: |
           export PYTHONPATH=src
           export GEMINI_API_KEY=test
-          pdm run pytest --junitxml=pytest.xml --cov-report=term-missing --cov=src -v | tee pytest-coverage.txt
+          pdm run pytest \
+          --junitxml=junit.xml -o junit_family=legacy \
+          --cov-report=term-missing \
+          --cov-report=xml \
+          --cov=src -v | tee pytest-coverage.txt
 
       - name: Pytest coverage comment
         if: github.event_name == 'pull_request'
         uses: MishaKav/pytest-coverage-comment@main
         with:
           pytest-coverage-path: ./pytest-coverage.txt
-          junitxml-path: ./pytest.xml
+          junitxml-path: ./junit.xml
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
