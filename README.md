@@ -24,7 +24,8 @@ Experience Ollaix live here: [https://ollaix.macktireh.dev](https://ollaix.mackt
 
 <video src="https://github-production-user-asset-6210df.s3.amazonaws.com/49348001/466126628-ad73ba7a-1796-4454-a258-d95998f1fa3b.mp4" align="center"></video>
 
-<img src="https://github-production-user-asset-6210df.s3.amazonaws.com/49348001/466129191-378933b7-a7d9-4837-b0cf-84795b0f4c99.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAVCODYLSA53PQK4ZA%2F20250714%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20250714T174137Z&X-Amz-Expires=300&X-Amz-Signature=02f8c1c34063d27e7aa5fe89a05ed0c600b2e1105a49cdace4f2c61bb2e11b4e&X-Amz-SignedHeaders=host" alt="API docs" />
+<img src="https://github.com/user-attachments/assets/a7bb57d2-ff22-425e-b7d0-9a15f08e83fb" alt="API docs" />
+
 
 ---
 
