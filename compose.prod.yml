@@ -1,0 +1,76 @@
+name: "ollaix_production"
+
+services:
+  traefik:
+    image: "traefik:v3.4.4"
+    container_name: "traefik_proxy"
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    command:
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--certificatesresolvers.cloudflare.acme.tlschallenge=true"
+      - "--certificatesresolvers.cloudflare.acme.email=${CF_EMAIL}"
+      - "--certificatesresolvers.cloudflare.acme.storage=/letsencrypt/acme.json"
+      - "--certificatesresolvers.cloudflare.acme.caServer=https://acme-v02.api.letsencrypt.org/directory"
+      - "--log.level=INFO"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "./letsencrypt:/letsencrypt"
+    networks:
+      - web
+
+  ollaix_api_prod:
+    image: ghcr.io/macktireh/ollaix-api:latest
+    container_name: ollaix_api_prod
+    env_file:
+      - .env
+    networks:
+      - web
+    restart: unless-stopped
+    depends_on:
+      ollaix_ollama_gemma3_1b_prod:
+        condition: service_healthy
+      ollaix_ollama_qwen3_1_7b_prod:
+        condition: service_healthy
+      ollaix_ollama_deepseek_r1_1_5b_prod:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.api.rule=Host(`api.ollaix.macktireh.dev`)"
+      - "traefik.http.routers.api.entrypoints=websecure"
+      - "traefik.http.routers.api.tls.certresolver=cloudflare"
+      - "traefik.http.services.api.loadbalancer.server.port=8000"
+
+  ollaix_ollama_gemma3_1b_prod: &ollaix_ollama_defaults
+    image: ghcr.io/macktireh/ollaix-ollama-gemma3-1b:latest
+    container_name: ollaix_ollama_gemma3_1b_prod
+    networks:
+      - web
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  ollaix_ollama_qwen3_1_7b_prod:
+    <<: *ollaix_ollama_defaults
+    image: ghcr.io/macktireh/ollaix-ollama-qwen3-1_7b:latest
+    container_name: ollaix_ollama_qwen3_1_7b_prod
+
+  ollaix_ollama_deepseek_r1_1_5b_prod:
+    <<: *ollaix_ollama_defaults
+    image: ghcr.io/macktireh/ollaix-ollama-deepseek-r1-1_5b:latest
+    container_name: ollaix_ollama_deepseek_r1_1_5b_prod
+
+networks:
+  web:
+    name: traefik_web_network
+  internal:
+    name: ollaix_internal_network
